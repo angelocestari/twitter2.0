@@ -8,7 +8,7 @@ port = 12000
 print(f"Endereço do servidor: {server_address}:{port}")
 
 #Prepara os sockets do servidor
-serverSocket = socket(socket.AF_INET, socket.SOCK_DGRAM)
+serverSocket = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 serverSocket.bind(('', port))
 
 clientes_ativos = {}
@@ -23,7 +23,7 @@ def resposta_servidor(mensagem, endereco_cliente):
 
     if partes_mensagem[0] == '0':
         #Id disponível
-        if not clientes_ativos[partes_mensagem[1]] and partes_mensagem[1] != '0':
+        if partes_mensagem[1] not in clientes_ativos and partes_mensagem[1] != '0':
             serverSocket.sendto(mensagem.encode(), endereco_cliente)
             clientes_ativos[partes_mensagem[1]] = endereco_cliente
         #Erro: Id indisponível
@@ -57,9 +57,9 @@ def resposta_servidor(mensagem, endereco_cliente):
 while True:
     #Espera receber uma mensagem
     mensagem, endereco_cliente = serverSocket.recvfrom(1024)
-    
+
     #responde a Mensagem
-    resposta_servidor(mensagem, endereco_cliente)
+    resposta_servidor(mensagem.decode(), endereco_cliente)
 
     
 
