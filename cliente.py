@@ -22,7 +22,12 @@ def limited_username_input(user_input):
 
 def pagina_criar_conexao():
     st.title("Insira os dados do cliente")
-    user_id_input = st.text_input("Digite seu ID (Entre 1 e 999)")
+
+    if 'user_id' not in st.session_state:
+        st.session_state['user_id'] = ''
+
+    st.session_state['user_id'] = st.text_input("Digite seu ID (Entre 1 e 999)", value=st.session_state['user_id'])
+
     username_input = st.text_input("Digite o seu nome de usuário (Máximo: 20 caracteres)")
     
     if 'server_ip' not in st.session_state:
@@ -35,7 +40,7 @@ def pagina_criar_conexao():
 
     if st.button('Enviar'):
 
-        user_id = limited_userId_input(user_id_input)
+        user_id = limited_userId_input(st.session_state['user_id'])
         username = limited_username_input(username_input)
 
         if user_id and username and st.session_state['server_ip'] and st.session_state['server_port']:
@@ -69,6 +74,24 @@ def pagina_enviar_mensagem():
             st.text(lista_usuarios.decode())
             serverSocket.close()
 
+        except Exception as e:
+            st.error(f'Erro ao conectar ao servidor: {e}')
+
+    if st.button("Enviar Mensagem"):
+        try:
+            serverSocket = socket(AF_INET, SOCK_DGRAM)
+            serverSocket.settimeout(1)
+            destino = st.text_input("ID de destino")
+            mensagem = st.text_input("Digite sua mensagem")
+            tamanho_mensagem = len(mensagem)
+            data = f'2 {st.session_state['user_id']} {destino} {tamanho_mensagem} angelo {mensagem}'
+            serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
+
+            resposta, _ = serverSocket.recvfrom(1024)
+            st.write("Resposta do servidor ao enviar mensagem:")
+            st.text(resposta.decode())
+            serverSocket.close()
+        
         except Exception as e:
             st.error(f'Erro ao conectar ao servidor: {e}')
 
