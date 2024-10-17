@@ -13,8 +13,11 @@ serverSocket.bind(('', port))
 
 clientes_ativos = {}
 
-def resposta_servidor(mensagem, endereco_cliente):
-    
+def resposta_servidor(mensagem_cliente, endereco_cliente):
+
+    #Decodifica a mensagem recebida
+    mensagem = mensagem_cliente.decode()
+
     #Particiona a mensagem para tratamento dos dados
     partes_mensagem = mensagem.split(' ')
 
@@ -73,12 +76,9 @@ def resposta_servidor(mensagem, endereco_cliente):
 
 while True:
     #Espera receber uma mensagem
-    mensagem, endereco_cliente = serverSocket.recvfrom(1024)
+    mensagem, endereco = serverSocket.recvfrom(1024)
 
-    #responde a mensagem
-    resposta_servidor(mensagem.decode(), endereco_cliente)
-
-    
-
-    
-
+    #Cria thread para responder a mensagem
+    threading.Thread(target=resposta_servidor,
+        args=(mensagem,endereco)
+    ).start()
