@@ -145,6 +145,23 @@ def verifica_desconecta(mensagem_cliente, endereco_cliente):
     if len(partes_mensagem) > 1 and partes_mensagem[1] in clientes_ativos and clientes_ativos[partes_mensagem[1]] == endereco_cliente:
         del clientes_ativos[partes_mensagem[1]]
 
+def envia_status():
+    clientes_destino = clientes_ativos.copy()
+
+    tempo_atual = time.time() - tempo_inicial
+    tempo_atual = round(tempo_atual, 2)
+
+    for id, cliente in clientes_destino.items():
+        texto = f"{len(clientes_destino)} clientes, servidor ativo a {tempo_atual}s"
+        mensagem = f"2 0 {id} {len(texto)} servidor {texto}"
+        serverSocket.sendto(mensagem.encode(), cliente)
+
+def periodicamente_envia_status():
+    while True:
+        envia_status()
+        time.sleep(60)
+
+threading.Thread(target=periodicamente_envia_status).start()
 
 while True:
     #DEBUG
