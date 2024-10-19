@@ -62,29 +62,30 @@ def pagina_criar_conexao():
 def pagina_enviar_mensagem():
     st.title('ENVIAR MENSAGEM')
 
-    if st.button("Listar Usuários Ativos"):
-        try:
-            serverSocket = socket(AF_INET, SOCK_DGRAM)
-            serverSocket.settimeout(1)
-            data = 'list'
-            serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
+    # if st.button("Listar Usuários Ativos"):
+    #     try:
+    #         serverSocket = socket(AF_INET, SOCK_DGRAM)
+    #         serverSocket.settimeout(1)
+    #         data = 'list'
+    #         serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
 
-            lista_usuarios,_ = serverSocket.recvfrom(1024)
-            st.write("Usuários Ativos:")
-            st.text(lista_usuarios.decode())
-            serverSocket.close()
+    #         lista_usuarios,_ = serverSocket.recvfrom(1024)
+    #         st.write("Usuários Ativos:")
+    #         st.text(lista_usuarios.decode())
+    #         serverSocket.close()
 
-        except Exception as e:
-            st.error(f'Erro ao conectar ao servidor: {e}')
+    #     except Exception as e:
+    #         st.error(f'Erro ao conectar ao servidor: {e}')
+
+    destino = st.text_input("ID de destino")
+    mensagem = st.text_input("Digite sua mensagem")
 
     if st.button("Enviar Mensagem"):
         try:
             serverSocket = socket(AF_INET, SOCK_DGRAM)
             serverSocket.settimeout(1)
-            destino = st.text_input("ID de destino")
-            mensagem = st.text_input("Digite sua mensagem")
             tamanho_mensagem = len(mensagem)
-            data = f'2 {st.session_state['user_id']} {destino} {tamanho_mensagem} angelo {mensagem}'
+            data = f"2 {st.session_state['user_id']} {destino} {tamanho_mensagem} angelo {mensagem}"
             serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
 
             resposta, _ = serverSocket.recvfrom(1024)
@@ -95,12 +96,29 @@ def pagina_enviar_mensagem():
         except Exception as e:
             st.error(f'Erro ao conectar ao servidor: {e}')
 
+def pagina_encerrar_conexao():
+    st.title("Encerrar conexão")
+
+    try:
+        serverSocket = socket(AF_INET, SOCK_DGRAM)
+        serverSocket.settimeout(2)
+        if st.button("Encerrar conexão"):
+            data = f"1 {st.session_state['user_id']} 0 0 angelo"
+            serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
+            resposta,_ = serverSocket.recvfrom(1024)
+            st.text(resposta.decode())
+            serverSocket.close()
+
+    except Exception as e:
+        st.error(f"Erro ao encerrar conexão: {e}")
+
 def mudar_pagina(pagina):
     st.session_state['pagina'] = pagina
 
 paginas = {
     "Criar Conexão": pagina_criar_conexao,
-    "Enviar Mensagem": pagina_enviar_mensagem
+    "Enviar Mensagem": pagina_enviar_mensagem,
+    "Encerrar Conexão": pagina_encerrar_conexao
 }
 
 if 'pagina' not in st.session_state:
