@@ -127,6 +127,12 @@ def resposta_servidor(mensagem_cliente, endereco_cliente, copia_clientes_ativos)
             mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
             serverSocket.sendto(mensagem.encode(), endereco_cliente)
 
+    #LISTA CLIENTES
+    elif partes_mensagem[0] == '4':
+        texto = f"Clientes: {','.join(list(copia_clientes_ativos.keys()))}"
+        mensagem = f'4 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
+        serverSocket.sendto(mensagem.encode(), endereco_cliente)  
+
     else:
         texto = f"Mensagem enviada nao definida"
         mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
