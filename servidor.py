@@ -30,12 +30,12 @@ def resposta_servidor(mensagem_cliente, endereco_cliente, copia_clientes_ativos)
 
     #ERRO Mensagens inválidas
     if len(partes_mensagem) < 5:
-        texto = f"Mensagem sem a quantidade minima de campos"
+        texto = f"Mensagem sem a quantidade minima de campos\0"
         mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
         serverSocket.sendto(mensagem.encode(), endereco_cliente)
         return
     elif not (partes_mensagem[0].isdigit() and partes_mensagem[1].isdigit() and partes_mensagem[2].isdigit() and partes_mensagem[3].isdigit()):
-        texto = f"Algum dos campos inteiros nao esta correto"
+        texto = f"Algum dos campos inteiros nao esta correto\0"
         mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
         serverSocket.sendto(mensagem.encode(), endereco_cliente)
         return
@@ -60,7 +60,7 @@ def resposta_servidor(mensagem_cliente, endereco_cliente, copia_clientes_ativos)
             print(log_atualizacao)
         else:
             #ERRO Id indisponível, somente responde
-            texto = f"Id {partes_mensagem[1]} indisponivel"
+            texto = f"Id {partes_mensagem[1]} indisponivel\0"
             mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
 
             serverSocket.sendto(mensagem.encode(), endereco_cliente)
@@ -87,7 +87,7 @@ def resposta_servidor(mensagem_cliente, endereco_cliente, copia_clientes_ativos)
 
         #ERRO cliente não registrado
         else:
-            texto = f"Id informado para TCHAU nao registrado"
+            texto = f"Id informado para TCHAU nao registrado\0"
             mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
             serverSocket.sendto(mensagem.encode(), endereco_cliente)
 
@@ -117,24 +117,24 @@ def resposta_servidor(mensagem_cliente, endereco_cliente, copia_clientes_ativos)
         
         #ERRO Origem não registrada
         elif not (partes_mensagem[1] in copia_clientes_ativos):
-            texto = "Origem da mensagem nao registrada"
+            texto = "Origem da mensagem nao registrada\0"
             mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
             serverSocket.sendto(mensagem.encode(), endereco_cliente) 
 
         #ERRO Destino não registrado
         else:
-            texto = "Destino da mensagem nao registrado"
+            texto = "Destino da mensagem nao registrado\0"
             mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
             serverSocket.sendto(mensagem.encode(), endereco_cliente)
 
     #LISTA CLIENTES
     elif partes_mensagem[0] == '4':
-        texto = f"Clientes: {','.join(list(copia_clientes_ativos.keys()))}"
+        texto = f"Clientes: {','.join(list(copia_clientes_ativos.keys()))}\0"
         mensagem = f'4 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
         serverSocket.sendto(mensagem.encode(), endereco_cliente)  
 
     else:
-        texto = f"Mensagem enviada nao definida"
+        texto = f"Mensagem enviada nao definida\0"
         mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
 
     # print(clientes_ativos)
@@ -158,7 +158,7 @@ def envia_status():
     tempo_atual = round(tempo_atual, 2)
 
     for id, cliente in clientes_destino.items():
-        texto = f"{len(clientes_destino)} clientes, servidor ativo a {tempo_atual}s"
+        texto = f"{len(clientes_destino)} clientes, servidor ativo a {tempo_atual}s\0"
         mensagem = f"2 0 {id} {len(texto)} servidor {texto}"
         serverSocket.sendto(mensagem.encode(), cliente)
 
@@ -170,8 +170,6 @@ def periodicamente_envia_status():
 threading.Thread(target=periodicamente_envia_status).start()
 
 while True:
-    #DEBUG
-    # print(clientes_ativos)
     try:
         #Espera receber uma mensagem
         mensagem, endereco = serverSocket.recvfrom(1024)
