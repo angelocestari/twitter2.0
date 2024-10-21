@@ -21,9 +21,9 @@ def limited_username_input(user_input):
         return None
     return user_input.strip()
 
-def escutar_mensagem():
-    try:   
-        while True:
+def escutar_mensagem():   
+    while True:
+        try:
             message, _ = serverSocket.recvfrom(1024)
             mensagem_decodificada = message.decode()
 
@@ -31,11 +31,11 @@ def escutar_mensagem():
                 st.session_state['mensagens_recebidas'] = []
             
             st.session_state['mensagens_recebidas'].append(mensagem_decodificada)
-    except Exception as e:
-        st.error(f"Erro ao receber mensagem: {e}")
+        except Exception as e:
+            st.error(f"Erro ao receber mensagem: {e}")
 
 serverSocket = socket(AF_INET, SOCK_DGRAM)
-serverSocket.settimeout(10)
+# serverSocket.settimeout(10)
 
 if 'escutando_mensagens' not in st.session_state:
     st.session_state['escutando_mensagens'] = False
@@ -115,8 +115,6 @@ def pagina_enviar_mensagem():
         try:
             data = f'2 {st.session_state['user_id']} {st.session_state['id_destino']} {len(st.session_state['mensagem'])} {st.session_state['username_input']} {st.session_state['mensagem']}'
             serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
-            message, _ = serverSocket.recvfrom(1024)
-            st.success(f"Resposta do servidor: {message.decode()}")
         except Exception as e:
             st.error(f"Erro ao conectar ao servidor: {e}")
 
@@ -130,7 +128,9 @@ def pagina_receber_mensagens():
 
     if len(st.session_state['mensagens_recebidas']) == 0:
         st.write("Nenhuma mensagem recebida.")
+        print('NADA')
     else:
+        print('TUDO')
         for msg in st.session_state['mensagens_recebidas']:
             st.write(msg)
     
