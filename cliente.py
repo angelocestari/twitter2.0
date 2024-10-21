@@ -22,10 +22,7 @@ def limited_username_input(user_input):
     return user_input.strip()
 
 def escutar_mensagem():
-    try:
-        serverSocket = socket(AF_INET, SOCK_DGRAM)
-        serverSocket.bind(("",0))
-
+    try:   
         while True:
             message, _ = serverSocket.recvfrom(1024)
             mensagem_decodificada = message.decode()
@@ -36,6 +33,9 @@ def escutar_mensagem():
             st.session_state['mensagens_recebidas'].append(mensagem_decodificada)
     except Exception as e:
         st.error(f"Erro ao receber mensagem: {e}")
+
+serverSocket = socket(AF_INET, SOCK_DGRAM)
+serverSocket.settimeout(10)
 
 if 'escutando_mensagens' not in st.session_state:
     st.session_state['escutando_mensagens'] = False
@@ -73,8 +73,6 @@ def pagina_criar_conexao():
 
         if user_id and username and st.session_state['server_ip'] and st.session_state['server_port']:
             try:
-                serverSocket = socket(AF_INET, SOCK_DGRAM)
-                serverSocket.settimeout(5)
                 data = f'0 {user_id} 0 0 {username}'
                 serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
 
@@ -93,8 +91,6 @@ def pagina_encerrar_conexao():
         username = st.session_state['username_input']
         userId = st.session_state['user_id']
         try:
-            serverSocket = socket(AF_INET, SOCK_DGRAM)
-            serverSocket.settimeout(5)
             data = f'1 {userId} 0 0 {username}'
             serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
 
@@ -117,8 +113,6 @@ def pagina_enviar_mensagem():
 
     if st.button('Enviar mensagem'):
         try:
-            serverSocket = socket(AF_INET, SOCK_DGRAM)
-            serverSocket.settimeout(5)
             data = f'2 {st.session_state['user_id']} {st.session_state['id_destino']} {len(st.session_state['mensagem'])} {st.session_state['username_input']} {st.session_state['mensagem']}'
             serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
             message, _ = serverSocket.recvfrom(1024)
@@ -146,9 +140,6 @@ def pagina_listar_clientes():
 
     if st.button("Obter lista de clientes"):
         try:
-            serverSocket = socket(AF_INET, SOCK_DGRAM)
-            serverSocket.settimeout(5)
-            
             user_id = st.session_state['user_id']
             data = f'4 {user_id} 0 0 servidor'
             serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
@@ -160,8 +151,6 @@ def pagina_listar_clientes():
 
         except Exception as e:
             st.error(f"Erro ao conectar ao servidor: {e}")
-        finally:
-            serverSocket.close()
 
 def mudar_pagina(pagina):
     st.session_state['pagina'] = pagina
