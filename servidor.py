@@ -130,12 +130,13 @@ def resposta_servidor(mensagem_cliente, endereco_cliente, copia_clientes_ativos)
     #LISTA CLIENTES
     elif partes_mensagem[0] == '4':
         texto = f"Clientes: {','.join(list(copia_clientes_ativos.keys()))}\0"
-        mensagem = f'4 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
-        serverSocket.sendto(mensagem.encode(), endereco_cliente)  
-
+        mensagem = f'2 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
+        serverSocket.sendto(mensagem.encode(), endereco_cliente)
+        
     else:
         texto = f"Mensagem enviada nao definida\0"
         mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
+        serverSocket.sendto(mensagem.encode(), endereco_cliente)
 
     # print(clientes_ativos)
 
@@ -182,4 +183,4 @@ while True:
             args=(mensagem,endereco,copia_clientes_ativos)
         ).start()
     except ConnectionResetError:
-        print(f"Conexão cortada subtamente")
+        logs.append(f"Conexão cortada subtamente")
