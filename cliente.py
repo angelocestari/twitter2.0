@@ -39,7 +39,8 @@ def desmonta_mensagem(mensagem_cliente:str) -> dict:
     except Exception as e:
         print(f"Erro inesperado: {e}")
         mensagem_desmontada = {
-            'valida': False
+            'valida': False,
+            'texto': ""
         }
         return mensagem_desmontada
     
