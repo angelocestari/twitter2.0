@@ -7,6 +7,59 @@ serverSocket = socket(AF_INET, SOCK_DGRAM)
 # serverSocket.settimeout(10)
 
 # FUNÇÕES
+
+def monta_mensagem(tipo:str, id_origem:str, id_destino:str, nome:str, texto:str='') -> str:
+
+    if texto!='':
+        texto = texto[:139]
+        texto = ' ' + texto + '\0'
+
+    mensagem = f'{tipo} {id_origem} {id_destino} {len(texto)-2} {nome}'
+    mensagem = mensagem + texto
+
+    return mensagem
+
+def desmonta_mensagem(mensagem_cliente:str) -> dict:
+
+    try:
+        partes_mensagem = mensagem_cliente.split(' ')
+
+        if not (partes_mensagem[0].isdigit() and partes_mensagem[1].isdigit() and partes_mensagem[2].isdigit() and partes_mensagem[3].isdigit()):
+            mensagem_desmontada = {
+                'valida': False
+            }
+            return mensagem_desmontada
+
+        if len(partes_mensagem) > 5:
+            texto = ' '.join(partes_mensagem[5:])
+        else:
+            texto=""
+
+        mensagem_desmontada = {
+            'tipo': partes_mensagem[0], 
+            'id_origem': partes_mensagem[1], 
+            'id_destino': partes_mensagem[2], 
+            'nome': partes_mensagem[4].replace('\0',''), 
+            'texto': texto.replace('\0',''),
+            'valida': True
+        }
+
+        return mensagem_desmontada
+    
+    except Exception as e:
+        print(f"Erro inesperado: {e}")
+        mensagem_desmontada = {
+            'valida': False
+        }
+        return mensagem_desmontada
+    
+def envia_mensagem(mensagem, endereco_cliente):
+    try:
+        serverSocket.sendto(mensagem.encode(), endereco_cliente)
+    except:
+        erro = "Erro ao tentar enviar mensagem"
+        print(erro)
+
 def limited_userId_input(user_input):
     try:
         user_id = int(user_input)
@@ -30,17 +83,16 @@ def escutar_mensagem():
         try:
             message, _ = serverSocket.recvfrom(1024)
             mensagem_decodificada = message.decode()
-            
-            st.session_state['mensagens_recebidas'].append(mensagem_decodificada)
+
+            mensagem_decodificada = desmonta_mensagem(mensagem_decodificada)
+            if mensagem_decodificada['valida'] and mensagem_decodificada['texto']!="":
+                st.session_state['mensagens_recebidas'].append(mensagem_decodificada)
         except Exception as e:
             st.error(f"Erro ao receber mensagem: {e}")
 
-def formata_mensagem_chat(msg: str) -> str:
-    mensagem_separada = msg.split(' ')
-    texto = mensagem_separada[5:]
-    texto = ' '.join(texto)
+def formata_mensagem_chat(msg: dict) -> str:
     
-    texto_ajustado = f'**{mensagem_separada[4]}({mensagem_separada[1]}):** {texto}'
+    texto_ajustado = f'**{msg['nome']}({msg['id_origem']}):** {msg['texto']}'
 
     return texto_ajustado
 
@@ -73,13 +125,14 @@ def pagina_criar_conexao():
 
         if user_id and username and st.session_state['server_ip'] and st.session_state['server_port']:
             try:
-                data = f'0 {user_id} 0 0 {username}'
-                serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
+                data = monta_mensagem('0', str(user_id), '0', '0', username)
+                envia_mensagem(data, (st.session_state['server_ip'], int(st.session_state['server_port'])))
 
                 message, _ = serverSocket.recvfrom(1024)
                 message = message.decode()
-                if message[0] == '0':
-                    st.success(f"Conectado")
+                message = desmonta_mensagem(message)
+                if message['tipo'] == '0':
+                    st.success(f"Conectado com o id {message['id_origem']}")
 
                     ajusta_mensagens_salvas()
 
@@ -89,7 +142,7 @@ def pagina_criar_conexao():
                     thread = add_script_run_ctx(thread,ctx)
                     thread.start()
                 else:
-                    st.error(f"Erro: {(' '.join(message.split(' ')[5:])).replace('\0','')}")
+                    st.error(f"Erro: {message['texto']}")
 
             except Exception as e:
                 st.error(f"Erro ao conectar ao servidor: {e}")
@@ -103,8 +156,8 @@ def pagina_encerrar_conexao():
         username = st.session_state['username_input']
         userId = st.session_state['user_id']
         try:
-            data = f'1 {userId} 0 0 {username}'
-            serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
+            data = monta_mensagem('1', str(userId), '0', '0', username)
+            envia_mensagem(data, (st.session_state['server_ip'], int(st.session_state['server_port'])))
 
             message, _ = serverSocket.recvfrom(1024)
             st.success(f"Resposta do servidor: {message.decode()}")
@@ -125,8 +178,8 @@ def pagina_enviar_mensagem():
 
     if st.button('Enviar mensagem'):
         try:
-            data = f'2 {st.session_state['user_id']} {st.session_state['id_destino']} {len(st.session_state['mensagem'])} {st.session_state['username_input']} {st.session_state['mensagem']}'
-            serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
+            data = monta_mensagem('2', str(st.session_state['user_id']), str(st.session_state['id_destino']), st.session_state['username_input'], texto=st.session_state['mensagem'])
+            envia_mensagem(data, (st.session_state['server_ip'], int(st.session_state['server_port'])))
         except Exception as e:
             st.error(f"Erro ao conectar ao servidor: {e}")
 
@@ -152,13 +205,13 @@ def pagina_listar_clientes():
     if st.button("Obter lista de clientes"):
         try:
             user_id = st.session_state['user_id']
-            data = f'4 {user_id} 0 0 servidor'
-            serverSocket.sendto(data.encode(), (st.session_state['server_ip'], int(st.session_state['server_port'])))
+            data = monta_mensagem('4', str(user_id), '0', 'servidor')
+            envia_mensagem(data, (st.session_state['server_ip'], int(st.session_state['server_port'])))
 
             message, _ = serverSocket.recvfrom(1024)
             mensagem_decodificada = message.decode()
-            mensagem_decodificada = mensagem_decodificada.replace('\0','').split(' ')[5:]
-            mensagem_decodificada = ' '.join(mensagem_decodificada)
+            mensagem_decodificada = desmonta_mensagem(mensagem_decodificada)
+            mensagem_decodificada = mensagem_decodificada['texto']
 
             st.success(f"Resposta do servidor: {mensagem_decodificada}")
 

@@ -16,69 +16,119 @@ serverSocket.bind(('', port))
 clientes_ativos = {}
 logs = []
 
+def monta_mensagem(tipo:str, id_origem:str, id_destino:str, nome:str, texto:str='') -> str:
+
+    if texto!='':
+        texto = texto[:139]
+        texto = ' ' + texto + '\0'
+
+    mensagem = f'{tipo} {id_origem} {id_destino} {len(texto)-2} {nome}'
+    mensagem = mensagem + texto
+
+    return mensagem
+
+def desmonta_mensagem(mensagem_cliente:str) -> dict:
+
+    try:
+        partes_mensagem = mensagem_cliente.split(' ')
+
+        if not (partes_mensagem[0].isdigit() and partes_mensagem[1].isdigit() and partes_mensagem[2].isdigit() and partes_mensagem[3].isdigit()):
+            mensagem_desmontada = {
+                'valida': False
+            }
+            return mensagem_desmontada
+
+        if len(partes_mensagem) > 5:
+            texto = ' '.join(partes_mensagem[5:])
+        else:
+            texto=""
+
+        mensagem_desmontada = {
+            'tipo': partes_mensagem[0], 
+            'id_origem': partes_mensagem[1], 
+            'id_destino': partes_mensagem[2], 
+            'nome': partes_mensagem[4], 
+            'texto': texto,
+            'valida': True
+        }
+
+        return mensagem_desmontada
+    
+    except Exception as e:
+        print(f"Erro inesperado: {e}")
+        mensagem_desmontada = {
+            'valida': False
+        }
+        return mensagem_desmontada
+
+def monta_erro(id_cliente:str, mensagem_erro:str) -> str:
+
+    mensagem = monta_mensagem('3', '0', id_cliente, "servidor", mensagem_erro)
+
+    return mensagem
+
+def envia_mensagem(mensagem, endereco):
+    try:
+        serverSocket.sendto(mensagem.encode(), endereco)
+    except:
+        erro = "Erro ao tentar enviar mensagem"
+        print(erro)
+        logs.append(erro)
+
 #Realiza o tratamento das dados recebidos
 def resposta_servidor(mensagem_cliente, endereco_cliente, copia_clientes_ativos):
 
     #Decodifica a mensagem recebida
-    mensagem = mensagem_cliente.decode()
+    mensagem_cliente = mensagem_cliente.decode()
 
-    #DEBUG
-    # print(mensagem)
-
-    #Particiona a mensagem para tratamento dos dados
-    partes_mensagem = mensagem.split(' ')
+    #Trata a mensagem
+    mensagem = desmonta_mensagem(mensagem_cliente)
+    print(mensagem)
 
     #ERRO Mensagens inválidas
-    if len(partes_mensagem) < 5:
-        texto = f"Mensagem sem a quantidade minima de campos\0"
-        mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
-        serverSocket.sendto(mensagem.encode(), endereco_cliente)
-        return
-    elif not (partes_mensagem[0].isdigit() and partes_mensagem[1].isdigit() and partes_mensagem[2].isdigit() and partes_mensagem[3].isdigit()):
-        texto = f"Algum dos campos inteiros nao esta correto\0"
-        mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
-        serverSocket.sendto(mensagem.encode(), endereco_cliente)
+    if not mensagem['valida']:
+        resposta = monta_erro('0', "Formato da mensagem invalido")
+        envia_mensagem(resposta, endereco_cliente)
         return
 
     contem_texto = 0
-    if len(partes_mensagem) > 5 and partes_mensagem[4] != '0':
+    if mensagem['texto'] != "":
         contem_texto = 1
 
     #OI
-    if partes_mensagem[0] == '0':
-        numero_origem = int(partes_mensagem[1])
-        possivel_emissor = f"{numero_origem + 1000}"
-        if partes_mensagem[1] != '0' and not(partes_mensagem[1] in clientes_ativos) and numero_origem < 2000 \
-                and (numero_origem > 999 or (numero_origem > 0 and not(possivel_emissor in clientes_ativos))):
+    if mensagem['tipo'] == '0':
+        id_origem_num = int(mensagem['id_origem'])
+        possivel_emissor = f"{id_origem_num + 1000}"
+        if mensagem['id_origem'] != '0' and not(mensagem['id_origem'] in clientes_ativos) and id_origem_num < 2000 \
+                and (id_origem_num > 999 or (id_origem_num > 0 and not(possivel_emissor in clientes_ativos))):
             #Id disponível, responde e salva
-            clientes_ativos[partes_mensagem[1]] = endereco_cliente
-            serverSocket.sendto(mensagem.encode(), endereco_cliente)
+            clientes_ativos[mensagem['id_origem']] = endereco_cliente
+            envia_mensagem(mensagem_cliente,endereco_cliente)
             tempo_atual = time.time() - tempo_inicial
             tempo_atual = round(tempo_atual, 2)
-            log_atualizacao = f"conectado id:{partes_mensagem[1]} tempo:{tempo_atual}s"
+            log_atualizacao = f"conectado id:{mensagem['id_origem']} tempo:{tempo_atual}s"
             logs.append(log_atualizacao)
             print(log_atualizacao)
         else:
             #ERRO Id indisponível, somente responde
-            texto = f"Id {partes_mensagem[1]} indisponivel\0"
-            mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
-
-            serverSocket.sendto(mensagem.encode(), endereco_cliente)
+            texto = f"Id {mensagem['id_origem']} indisponivel"
+            mensagem = monta_mensagem('3', '0', mensagem['id_origem'], 'servidor', texto=texto)
+            envia_mensagem(mensagem,endereco_cliente)
 
     #TCHAU
-    elif partes_mensagem[0] == '1':
+    elif mensagem['tipo'] == '1':
 
         #Apaga registro do cliente
-        if partes_mensagem[1] in clientes_ativos:
-            del clientes_ativos[partes_mensagem[1]]
+        if mensagem['id_origem'] in clientes_ativos:
+            del clientes_ativos[mensagem['id_origem']]
             tempo_atual = time.time() - tempo_inicial
             tempo_atual = round(tempo_atual, 2)
-            log_atualizacao = f"desconectado id:{partes_mensagem[1]} tempo:{tempo_atual}s"
+            log_atualizacao = f"desconectado id:{mensagem['id_origem']} tempo:{tempo_atual}s"
             logs.append(log_atualizacao)
             print(log_atualizacao)
 
             #Verifica se existe e apaga um exibidor associado
-            possivel_exibidor = f"{int(partes_mensagem[1]) - 1000}"
+            possivel_exibidor = f"{int(mensagem['id_origem']) - 1000}"
             if possivel_exibidor in clientes_ativos:
                 del clientes_ativos[possivel_exibidor]
                 log_atualizacao = f"desconectado id:{possivel_exibidor} tempo:{tempo_atual}s"
@@ -87,70 +137,53 @@ def resposta_servidor(mensagem_cliente, endereco_cliente, copia_clientes_ativos)
 
         #ERRO cliente não registrado
         else:
-            texto = f"Id informado para TCHAU nao registrado\0"
-            mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
-            serverSocket.sendto(mensagem.encode(), endereco_cliente)
+            texto = f"Id informado para TCHAU nao registrado"
+            mensagem = monta_erro('0', texto)
+            envia_mensagem(mensagem,endereco_cliente)
 
     #MSG
-    elif partes_mensagem[0] == '2':
+    elif mensagem['tipo'] == '2':
 
         #Destino registrado
-        if (partes_mensagem[2] in copia_clientes_ativos or partes_mensagem[2] == '0') and partes_mensagem[1] in copia_clientes_ativos:
-            texto = ""
-            nome_origem = partes_mensagem[4] 
-            if contem_texto:
-                texto = partes_mensagem[5:]
-                texto = ' '.join(texto)
-                texto = texto[:min(int(partes_mensagem[3]),140)]
-
+        if (mensagem['id_destino'] in copia_clientes_ativos or mensagem['id_destino'] == '0') and mensagem['id_origem'] in copia_clientes_ativos:
+            
             clientes_destino = {}
-            if partes_mensagem[2] == '0':
+            if mensagem['id_destino'] == '0':
                 #Envia para todos os clientes
                 clientes_destino = copia_clientes_ativos.copy()
             else:
                 #Enviar somente para um cliente especificado
-                clientes_destino[partes_mensagem[2]] = copia_clientes_ativos[partes_mensagem[2]]
+                clientes_destino[mensagem['id_destino']] = copia_clientes_ativos[mensagem['id_destino']]
 
             for id, cliente in clientes_destino.items():
-                mensagem = f"2 {partes_mensagem[1]} {id} {len(texto)} {nome_origem} {texto}"
-                serverSocket.sendto(mensagem.encode(), cliente)
+                mensagem = monta_mensagem('2', mensagem['id_origem'], mensagem['id_destino'], mensagem['nome'], texto=mensagem['texto'])
+                envia_mensagem(mensagem,cliente)
         
         #ERRO Origem não registrada
-        elif not (partes_mensagem[1] in copia_clientes_ativos):
-            texto = "Origem da mensagem nao registrada\0"
-            mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
-            serverSocket.sendto(mensagem.encode(), endereco_cliente) 
+        elif not (mensagem['id_origem'] in copia_clientes_ativos):
+            texto = "Origem da mensagem nao registrada"
+            mensagem = monta_erro('0', texto)
+            envia_mensagem(mensagem,endereco_cliente)
 
         #ERRO Destino não registrado
         else:
-            texto = "Destino da mensagem nao registrado\0"
-            mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
-            serverSocket.sendto(mensagem.encode(), endereco_cliente)
+            texto = "Destino da mensagem nao registrado"
+            mensagem = monta_erro(mensagem['id_origem'], texto)
+            envia_mensagem(mensagem,endereco_cliente)
 
     #LISTA CLIENTES
-    elif partes_mensagem[0] == '4':
-        texto = f"Clientes: {','.join(list(copia_clientes_ativos.keys()))}\0"
-        mensagem = f'2 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
-        serverSocket.sendto(mensagem.encode(), endereco_cliente)
-        
+    elif mensagem['tipo'] == '4':
+        texto = f"Clientes: {','.join(list(copia_clientes_ativos.keys()))}"
+        mensagem = monta_mensagem('2', '0', mensagem['id_origem'], 'servidor', texto=texto)
+        envia_mensagem(mensagem,endereco_cliente)
+
     else:
-        texto = f"Mensagem enviada nao definida\0"
-        mensagem = f'3 0 {partes_mensagem[1]} {len(texto)} servidor {texto}'
-        serverSocket.sendto(mensagem.encode(), endereco_cliente)
+        texto = f"Tipo de mensagem nao esperado"
+        mensagem = monta_erro(mensagem['id_origem'], texto)
+        envia_mensagem(mensagem,endereco_cliente)
 
     # print(clientes_ativos)
 
-
-def verifica_desconecta(mensagem_cliente, endereco_cliente):
-
-    #Decodifica a mensagem
-    mensagem = mensagem_cliente.decode()
-
-    #Quebra a mensagem para tratamento
-    partes_mensagem = mensagem.split(' ')
-
-    if len(partes_mensagem) > 1 and partes_mensagem[1] in clientes_ativos and clientes_ativos[partes_mensagem[1]] == endereco_cliente:
-        del clientes_ativos[partes_mensagem[1]]
 
 def envia_status():
     clientes_destino = clientes_ativos.copy()
@@ -159,8 +192,9 @@ def envia_status():
     tempo_atual = round(tempo_atual, 2)
 
     for id, cliente in clientes_destino.items():
-        texto = f"{len(clientes_destino)} clientes, servidor ativo a {tempo_atual}s\0"
-        mensagem = f"2 0 {id} {len(texto)} servidor {texto}"
+        texto = f"{len(clientes_destino)} clientes, servidor ativo a {tempo_atual}s"
+        # mensagem = f"2 0 {id} {len(texto)} servidor {texto}"
+        mensagem = monta_mensagem('2', '0', id, 'servidor', texto)
         serverSocket.sendto(mensagem.encode(), cliente)
 
 def periodicamente_envia_status():
