@@ -1,6 +1,7 @@
 import socket
 import threading
 import time
+import struct
 
 tempo_inicial = time.time()
 
@@ -19,38 +20,29 @@ logs = []
 def monta_mensagem(tipo:str, id_origem:str, id_destino:str, nome:str, texto:str='') -> str:
 
     if texto!='':
-        texto = texto[:139]
+        texto = texto[:140]
         texto = ' ' + texto + '\0'
+    nome = nome[:20]
 
-    mensagem = f'{tipo} {id_origem} {id_destino} {len(texto)-2} {nome}'
-    mensagem = mensagem + texto
+    mensagem = struct.pack('!IIII20s141s', int(tipo), int(id_origem), int(id_destino), len(texto), nome.encode(), texto.encode())
 
     return mensagem
 
 def desmonta_mensagem(mensagem_cliente:str) -> dict:
 
     try:
-        partes_mensagem = mensagem_cliente.split(' ')
 
-        if not (partes_mensagem[0].isdigit() and partes_mensagem[1].isdigit() and partes_mensagem[2].isdigit() and partes_mensagem[3].isdigit()):
-            mensagem_desmontada = {
-                'valida': False
-            }
-            return mensagem_desmontada
-
-        if len(partes_mensagem) > 5:
-            texto = ' '.join(partes_mensagem[5:])
-        else:
-            texto=""
+        tipo, origem, destino, tamanho, nome, texto = struct.unpack('!IIII20s141s', mensagem_cliente)
 
         mensagem_desmontada = {
-            'tipo': partes_mensagem[0], 
-            'id_origem': partes_mensagem[1], 
-            'id_destino': partes_mensagem[2], 
-            'nome': partes_mensagem[4], 
-            'texto': texto,
+            'tipo': str(tipo), 
+            'id_origem': str(origem), 
+            'id_destino': str(destino), 
+            'nome': nome.decode().replace('\0',''), 
+            'texto': texto.decode().replace('\0',''),
             'valida': True
         }
+        print(mensagem_desmontada)
 
         return mensagem_desmontada
     
@@ -69,7 +61,7 @@ def monta_erro(id_cliente:str, mensagem_erro:str) -> str:
 
 def envia_mensagem(mensagem, endereco):
     try:
-        serverSocket.sendto(mensagem.encode(), endereco)
+        serverSocket.sendto(mensagem, endereco)
     except:
         erro = "Erro ao tentar enviar mensagem"
         print(erro)
@@ -78,10 +70,7 @@ def envia_mensagem(mensagem, endereco):
 #Realiza o tratamento das dados recebidos
 def resposta_servidor(mensagem_cliente, endereco_cliente, copia_clientes_ativos):
 
-    #Decodifica a mensagem recebida
-    mensagem_cliente = mensagem_cliente.decode()
-
-    #Trata a mensagem
+  #Trata a mensagem
     mensagem = desmonta_mensagem(mensagem_cliente)
     print(mensagem)
 
@@ -103,6 +92,7 @@ def resposta_servidor(mensagem_cliente, endereco_cliente, copia_clientes_ativos)
                 and (id_origem_num > 999 or (id_origem_num > 0 and not(possivel_emissor in clientes_ativos))):
             #Id disponível, responde e salva
             clientes_ativos[mensagem['id_origem']] = endereco_cliente
+            mensagem = monta_mensagem('0', mensagem['id_origem'], mensagem['id_destino'], mensagem['texto'])
             envia_mensagem(mensagem_cliente,endereco_cliente)
             tempo_atual = time.time() - tempo_inicial
             tempo_atual = round(tempo_atual, 2)
@@ -182,8 +172,6 @@ def resposta_servidor(mensagem_cliente, endereco_cliente, copia_clientes_ativos)
         mensagem = monta_erro(mensagem['id_origem'], texto)
         envia_mensagem(mensagem,endereco_cliente)
 
-    # print(clientes_ativos)
-
 
 def envia_status():
     clientes_destino = clientes_ativos.copy()
@@ -193,9 +181,8 @@ def envia_status():
 
     for id, cliente in clientes_destino.items():
         texto = f"{len(clientes_destino)} clientes, servidor ativo a {tempo_atual}s"
-        # mensagem = f"2 0 {id} {len(texto)} servidor {texto}"
         mensagem = monta_mensagem('2', '0', id, 'servidor', texto)
-        serverSocket.sendto(mensagem.encode(), cliente)
+        envia_mensagem(mensagem,cliente)
 
 def periodicamente_envia_status():
     while True:
